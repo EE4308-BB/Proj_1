@@ -1,0 +1,6 @@
+/src/DynamixelSDK
+/src/turtlebot3_*
+/log
+/build
+/install
+key.txt
