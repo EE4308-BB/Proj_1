@@ -3,12 +3,24 @@
 namespace ee4308::turtle
 {   
     // ================ Potential Moves to Neighboring Cells  ======================
-    static const std::array<std::tuple<int, int>, 4> MOVES_ = {{
+    static const std::array<std::tuple<int, int>, 4> MOVES_ = {{ // May change step size
         {0, 1}, // Right
         {0, -1}, // Left
         {1, 0}, // Down
         {-1, 0} // Up
     }};
+
+    std::vector<std::array<int, 2>> generatePathCoordinate(PlannerNode* node) {
+        std::vector<std::array<int, 2>> path_coord;
+        PlannerNode* current = node;
+        while (current != nullptr) {
+            path_coord.push_back({current->mx, current->my});
+            current = current->parent;
+        }
+
+        std::reverse(path_coord.begin(), path_coord.end());
+        return path_coord;
+    }
 
     // ======================== Nav2 Planner Plugin ===============================
     void Planner::configure(
@@ -30,11 +42,7 @@ namespace ee4308::turtle
         initParam(node_, plugin_name_ + ".sg_order", sg_order_, 3);
     }
 
-    int calc_index(int mx, int my, int size_my) {
-        return mx * size_my + my;
-    }
-
-    bool is_valid_neighbor(int mx, int my) {
+    bool is_valid_neighbor(int mx, int my) { // TODO: implement
         return true;
     }
 
@@ -69,16 +77,14 @@ namespace ee4308::turtle
         open_list.queue(start_node); // Queue start node
         
         while (!open_list.empty()) {
-            PlannerNode *current_node = open_list.pop(); // TODO: check for nullptr
+            PlannerNode *current_node = open_list.pop();
 
             if current_node->expanded: // node is explored
                 continue;
             else if current_node->mx == goal_mx and current_node->my == goal_my: // current node is goal (might want to implement tolerancing)
-                // Find a preliminary path by iterating from current_node to start node
-                // Reverse the path so that the start is at the front of the path and goal is at the back
-                // Convert the path from map coordinates to world coordinates
-                // Apply Savitsky Golay smoothing to the path
-                // return path
+                std::vector<std::array<int, 2>> path_coord = generatePathCoordinate(current_node->parent); // Check whether current_node or the parent is required, as writeToPath already used goal pose
+                return writeToPath(path_coord, goal);
+                // TODO: Apply Savitsky Golay smoothing to the path
 
             // Mark as expanded
             current_node->expanded = true;
@@ -107,8 +113,6 @@ namespace ee4308::turtle
             }
         }
         
-        
-
         // draws a straight line from goal to start on the grid
         // mimics how a vector is typically filled when iterating from the goal node to start node.
         ray_tracer.init(goal_mx, goal_my, start_mx, start_my);
