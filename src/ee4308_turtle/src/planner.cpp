@@ -23,26 +23,75 @@ namespace ee4308::turtle
         initParam(node_, plugin_name_ + ".sg_order", sg_order_, 3);
     }
 
+    int calc_index(int mx, int my, int size_my) {
+        return mx * size_my + my;
+    }
+
+    bool is_valid_neighbor(int mx, int my) {
+        return true;
+    }
+
     nav_msgs::msg::Path Planner::createPlan(
         const geometry_msgs::msg::PoseStamped &start,
         const geometry_msgs::msg::PoseStamped &goal)
     {
         // initializations
-        PlannerNodes nodes(costmap_->getSizeInCellsX(), costmap_->getSizeInCellsY());
-        OpenList open_list;
+        int size_mx = costmap_->getSizeInCellsX();
+        int size_my = costmap_->getSizeInCellsY();
+        PlannerNodes nodes(size_mx, size_my); // Store nodes in 1D collapsed array
+        OpenList open_list; // Initialize empty open-list, implemented using pq // Essentially frontier
+        std::vector<bool> visited_array(size_mx * size_my, false); // Visited array as 1D collapsed array
         RayTracer ray_tracer;
 
         int start_mx, start_my, goal_mx, goal_my;
         costmap_->worldToMapEnforceBounds(
             start.pose.position.x, start.pose.position.y,
-            start_mx, start_my);
+            start_mx, start_my); // convert start positions in world coord to map coord
+
         costmap_->worldToMapEnforceBounds(
             goal.pose.position.x, goal.pose.position.y,
-            goal_mx, goal_my);
+            goal_mx, goal_my); // convert goal positions in world coord to map coord
+
+        // All nodes in PlannerNodes are already defined with f, g, h as infinity
+        
+        PlannerNode *start_node = nodes.getNode(start_mx, start_my); // Pointer to start pos
+        
+        start_node->g = 0; // Initialize start node with 0 g-cost
+        open_list.queue(start_node); // Queue start node
+        
+        int start_node_index = calc_index(start_mx, start_my, size_my);
+        visited_array[start_node_index] = true; // mark start as visited
+
+        while (!open_list.empty()) {
+            PlannerNode *current_node = open_list.pop(); // TODO: check for nullptr
+            // TODO: check if explored
+
+            int current_node_index = calc_index(current_node->mx, current_node->my, size_my);
+            if visited_array[current_node_index]: // node is explored
+                continue;
+            else if current_node->mx == goal_mx and current_node->my == goal_my: // current node is goal (might want to implement tolerancing)
+                // Find a preliminary path by iterating from current_node to start node
+                // Reverse the path so that the start is at the front of the path and goal is at the back
+                // Convert the path from map coordinates to world coordinates
+                // Apply Savitsky Golay smoothing to the path
+                // return path
+
+            // Mark as expanded
+            visited_array[current_node_index] = true;
+
+            for (// each accessible neighbor node) {
+            
+            }
+
+        }
+        
+        
 
         // draws a straight line from goal to start on the grid
         // mimics how a vector is typically filled when iterating from the goal node to start node.
         ray_tracer.init(goal_mx, goal_my, start_mx, start_my);
+        
+
         std::vector<std::array<int, 2>> coords;
         while (rclcpp::ok())
         {
@@ -54,7 +103,7 @@ namespace ee4308::turtle
         }
 
         // reverse the coordinates because the convention for filling nav_msgs::msg::Path is from start to goal.
-        std::reverse(coords.begin(), coords.end());
+        std::reverse(coords.begin(), coords.end()); // TODO: change
 
         return writeToPath(coords, goal);
     }
