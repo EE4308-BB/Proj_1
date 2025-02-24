@@ -112,26 +112,8 @@ namespace ee4308::turtle
                 }
             }
         }
-        
-        // draws a straight line from goal to start on the grid
-        // mimics how a vector is typically filled when iterating from the goal node to start node.
-        ray_tracer.init(goal_mx, goal_my, start_mx, start_my);
-        
-
-        std::vector<std::array<int, 2>> coords;
-        while (rclcpp::ok())
-        {
-            std::array<int, 2> coord = ray_tracer.frontCell();
-            coords.push_back(coord);
-            if (ray_tracer.reached())
-                break; // check reached here so 
-            ray_tracer.next();
-        }
-
-        // reverse the coordinates because the convention for filling nav_msgs::msg::Path is from start to goal.
-        std::reverse(coords.begin(), coords.end()); // TODO: change
-
-        return writeToPath(coords, goal);
+        std::vector<std::array<int, 2>> empty_path;
+        return writeToPath(empty_path, goal);
     }
 
     nav_msgs::msg::Path Planner::writeToPath(
