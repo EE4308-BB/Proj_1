@@ -36,7 +36,7 @@ namespace ee4308::turtle
         global_frame_id_ = costmap_ros->getGlobalFrameID();
 
         // initialize parameters
-        initParam(node_, plugin_name_ + ".max_access_cost", max_access_cost_, 255);
+        initParam(node_, plugin_name_ + ".max_access_cost", max_access_cost_, 210);
         initParam(node_, plugin_name_ + ".interpolation_distance", interpolation_distance_, 0.05);
         initParam(node_, plugin_name_ + ".sg_half_window", sg_half_window_, 5);
         initParam(node_, plugin_name_ + ".sg_order", sg_order_, 3);
@@ -66,7 +66,7 @@ namespace ee4308::turtle
         // initializations
         int size_mx = costmap_->getSizeInCellsX();
         int size_my = costmap_->getSizeInCellsY();
-        int movement_step_size = 4;
+        int movement_step_size = 1;
         PlannerNodes nodes(size_mx, size_my); // Store nodes in 1D collapsed array
         OpenList open_list; // Initialize empty open-list, implemented using pq // Essentially frontier
 
@@ -88,19 +88,23 @@ namespace ee4308::turtle
         start_node->f = start_node->g + start_node->h;
 
         open_list.queue(start_node); // Queue start node
+
+        //std::cout << "Start pos: " << start_mx << " " << start_my << std::endl;
+        //std::cout << "Goal pos: " << goal_mx << " " << goal_my << std::endl;
         
         while (!open_list.empty()) {
             PlannerNode *current_node = open_list.pop();
 
             if (current_node->expanded) { // node is explored
                 continue;
-            } else if (current_node->mx == goal_mx && current_node->my == goal_my) { // current node is goal (might want to implement tolerancing)
+            } else if (std::hypot(goal_mx - current_node->mx, goal_my - current_node->my) < 2) { // current node is goal (might want to implement tolerancing)
                 std::vector<std::array<int, 2>> path_coord = generatePathCoordinate(current_node); // Check whether current_node or the parent is required, as writeToPath already used goal pose
                 return writeToPath(path_coord, goal);
                 // TODO: Apply Savitsky Golay smoothing to the path
             }
             // Mark as expanded
             current_node->expanded = true;
+            //std::cout<< "Current pos: " << current_node->mx << " " << current_node->my << std::endl;
 
             for (const std::tuple<int, int>& move : MOVES_) {
                 int dx = std::get<0>(move);
@@ -114,9 +118,11 @@ namespace ee4308::turtle
                 }
                 PlannerNode *neighbor_node = nodes.getNode(neighbor_mx, neighbor_my);
                 int cost_at_neighbor = static_cast<int>(costmap_->getCost(neighbor_mx, neighbor_my));
+                //std::cout << "Neighbor position: " << neighbor_mx << " " << neighbor_my << std::endl;
+                //std::cout << "Cost at neighbor: " << cost_at_neighbor << std::endl;
                 int new_g_cost = current_node->g + movement_step_size * (cost_at_neighbor + 1);
                 if (new_g_cost < neighbor_node->g) {
-                    neighbor_node-> g = new_g_cost;
+                    neighbor_node->g = new_g_cost;
                     neighbor_node->parent = current_node;
                     neighbor_node->h = std::hypot(goal_mx - neighbor_mx, goal_my - neighbor_my);
                     neighbor_node->f = neighbor_node-> g + neighbor_node->h;
@@ -124,7 +130,6 @@ namespace ee4308::turtle
                 }
             }
         }
-
         std::vector<std::array<int, 2>> empty_path;
         return writeToPath(empty_path, goal);
     }
