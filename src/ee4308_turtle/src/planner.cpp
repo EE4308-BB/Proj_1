@@ -3,7 +3,7 @@
 namespace ee4308::turtle
 {   
     // ================ Potential Moves to Neighboring Cells  ======================
-    static const std::array<std::tuple<int, int>, 4> MOVES_ = {{ // May change step size
+    static const std::array<std::tuple<int, int>, 4> MOVES_ = {{
         {0, 1}, // Right
         {0, -1}, // Left
         {1, 0}, // Down
@@ -42,7 +42,20 @@ namespace ee4308::turtle
         initParam(node_, plugin_name_ + ".sg_order", sg_order_, 3);
     }
 
-    bool is_valid_neighbor(int mx, int my) { // TODO: implement
+    bool is_valid_neighbor(int mx, int my, int max_access_cost_, nav2_costmap_2d::Costmap2D* costmap_) { 
+        int size_mx = costmap->getSizeInCellsX();
+        int size_my = costmap->getSizeInCellsY();
+
+        if (mx < 0 || my < 0 || mx >= size_mx || my >= size_my) {
+            return false; // Out of bounds
+        }
+
+        int cost = static_cast<int>(costmap_->getCost(mx, my));
+
+        if (cost >= max_access_cost_) { // Near an obstacle
+            return false; // Invalid node
+        }   
+        
         return true;
     }
 
@@ -53,9 +66,9 @@ namespace ee4308::turtle
         // initializations
         int size_mx = costmap_->getSizeInCellsX();
         int size_my = costmap_->getSizeInCellsY();
+        int movement_step_size = 4;
         PlannerNodes nodes(size_mx, size_my); // Store nodes in 1D collapsed array
         OpenList open_list; // Initialize empty open-list, implemented using pq // Essentially frontier
-        RayTracer ray_tracer;
 
         int start_mx, start_my, goal_mx, goal_my;
         costmap_->worldToMapEnforceBounds(
@@ -79,13 +92,13 @@ namespace ee4308::turtle
         while (!open_list.empty()) {
             PlannerNode *current_node = open_list.pop();
 
-            if current_node->expanded: // node is explored
+            if (current_node->expanded) { // node is explored
                 continue;
-            else if current_node->mx == goal_mx and current_node->my == goal_my: // current node is goal (might want to implement tolerancing)
-                std::vector<std::array<int, 2>> path_coord = generatePathCoordinate(current_node->parent); // Check whether current_node or the parent is required, as writeToPath already used goal pose
+            } else if (current_node->mx == goal_mx && current_node->my == goal_my) { // current node is goal (might want to implement tolerancing)
+                std::vector<std::array<int, 2>> path_coord = generatePathCoordinate(current_node); // Check whether current_node or the parent is required, as writeToPath already used goal pose
                 return writeToPath(path_coord, goal);
                 // TODO: Apply Savitsky Golay smoothing to the path
-
+            }
             // Mark as expanded
             current_node->expanded = true;
 
@@ -93,16 +106,15 @@ namespace ee4308::turtle
                 int dx = std::get<0>(move);
                 int dy = std::get<1>(move);
                 
-                int neighbor_mx = current_node->mx + dx;
-                int neighbor_my = current_node->my + dy;
+                int neighbor_mx = current_node->mx + dx * movement_step_size;
+                int neighbor_my = current_node->my + dy * movement_step_size;
 
-                if (!is_valid_neighbor(neighbor_mx, neighbor_my)) {
+                if (!is_valid_neighbor(neighbor_mx, neighbor_my, max_access_cost_, costmap_)) {
                     continue;
                 }
-
                 PlannerNode *neighbor_node = nodes.getNode(neighbor_mx, neighbor_my);
                 int cost_at_neighbor = static_cast<int>(costmap_->getCost(neighbor_mx, neighbor_my));
-                int new_g_cost = current_node->g + 1 * (cost_at_neighbor + 1);
+                int new_g_cost = current_node->g + movement_step_size * (cost_at_neighbor + 1);
                 if (new_g_cost < neighbor_node->g) {
                     neighbor_node-> g = new_g_cost;
                     neighbor_node->parent = current_node;
@@ -112,6 +124,7 @@ namespace ee4308::turtle
                 }
             }
         }
+
         std::vector<std::array<int, 2>> empty_path;
         return writeToPath(empty_path, goal);
     }
