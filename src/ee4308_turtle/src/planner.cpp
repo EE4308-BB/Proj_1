@@ -43,8 +43,8 @@ namespace ee4308::turtle
     }
 
     bool is_valid_neighbor(int mx, int my, int max_access_cost_, nav2_costmap_2d::Costmap2D* costmap_) { 
-        int size_mx = costmap->getSizeInCellsX();
-        int size_my = costmap->getSizeInCellsY();
+        int size_mx = costmap_->getSizeInCellsX();
+        int size_my = costmap_->getSizeInCellsY();
 
         if (mx < 0 || my < 0 || mx >= size_mx || my >= size_my) {
             return false; // Out of bounds
