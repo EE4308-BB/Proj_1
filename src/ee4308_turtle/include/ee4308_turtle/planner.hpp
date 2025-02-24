@@ -18,7 +18,6 @@
 
 namespace ee4308::turtle
 {   
-    int calc_index(int mx, int my, int size_my);
 
     // ====================== Planner Node ===================
     struct PlannerNode

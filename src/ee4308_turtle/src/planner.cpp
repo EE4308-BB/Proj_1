@@ -1,7 +1,14 @@
 #include "ee4308_turtle/planner.hpp"
 
 namespace ee4308::turtle
-{
+{   
+    // ================ Potential Moves to Neighboring Cells  ======================
+    static const std::array<std::tuple<int, int>, 4> MOVES_ = {{
+        {0, 1}, // Right
+        {0, -1}, // Left
+        {1, 0}, // Down
+        {-1, 0} // Up
+    }};
 
     // ======================== Nav2 Planner Plugin ===============================
     void Planner::configure(
@@ -40,7 +47,6 @@ namespace ee4308::turtle
         int size_my = costmap_->getSizeInCellsY();
         PlannerNodes nodes(size_mx, size_my); // Store nodes in 1D collapsed array
         OpenList open_list; // Initialize empty open-list, implemented using pq // Essentially frontier
-        std::vector<bool> visited_array(size_mx * size_my, false); // Visited array as 1D collapsed array
         RayTracer ray_tracer;
 
         int start_mx, start_my, goal_mx, goal_my;
@@ -57,17 +63,15 @@ namespace ee4308::turtle
         PlannerNode *start_node = nodes.getNode(start_mx, start_my); // Pointer to start pos
         
         start_node->g = 0; // Initialize start node with 0 g-cost
+        start_node->h = std::hypot(goal_mx - start_mx, goal_my - start_my);
+        start_node->f = start_node->g + start_node->h;
+
         open_list.queue(start_node); // Queue start node
         
-        int start_node_index = calc_index(start_mx, start_my, size_my);
-        visited_array[start_node_index] = true; // mark start as visited
-
         while (!open_list.empty()) {
             PlannerNode *current_node = open_list.pop(); // TODO: check for nullptr
-            // TODO: check if explored
 
-            int current_node_index = calc_index(current_node->mx, current_node->my, size_my);
-            if visited_array[current_node_index]: // node is explored
+            if current_node->expanded: // node is explored
                 continue;
             else if current_node->mx == goal_mx and current_node->my == goal_my: // current node is goal (might want to implement tolerancing)
                 // Find a preliminary path by iterating from current_node to start node
@@ -77,12 +81,30 @@ namespace ee4308::turtle
                 // return path
 
             // Mark as expanded
-            visited_array[current_node_index] = true;
+            current_node->expanded = true;
 
-            for (// each accessible neighbor node) {
-            
+            for (const std::tuple<int, int>& move : MOVES_) {
+                int dx = std::get<0>(move);
+                int dy = std::get<1>(move);
+                
+                int neighbor_mx = current_node->mx + dx;
+                int neighbor_my = current_node->my + dy;
+
+                if (!is_valid_neighbor(neighbor_mx, neighbor_my)) {
+                    continue;
+                }
+
+                PlannerNode *neighbor_node = nodes.getNode(neighbor_mx, neighbor_my);
+                int cost_at_neighbor = static_cast<int>(costmap_->getCost(neighbor_mx, neighbor_my));
+                int new_g_cost = current_node->g + 1 * (cost_at_neighbor + 1);
+                if (new_g_cost < neighbor_node->g) {
+                    neighbor_node-> g = new_g_cost;
+                    neighbor_node->parent = current_node;
+                    neighbor_node->h = std::hypot(goal_mx - neighbor_mx, goal_my - neighbor_my);
+                    neighbor_node->f = neighbor_node-> g + neighbor_node->h;
+                    open_list.queue(neighbor_node);
+                }
             }
-
         }
         
         
