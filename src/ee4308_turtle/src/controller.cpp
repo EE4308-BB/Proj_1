@@ -45,10 +45,10 @@ namespace ee4308::turtle
         sub_scan_ = node_->create_subscription<sensor_msgs::msg::LaserScan>(
             "/scan", rclcpp::SensorDataQoS(),
             std::bind(&Controller::lidarCallback, this, std::placeholders::_1));
+    }
 
-        void lidarCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
-            scan_ranges_ = msg->ranges;
-        }
+    void Controller::lidarCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
+        scan_ranges_ = msg->ranges;
     }
 
     geometry_msgs::msg::TwistStamped Controller::computeVelocityCommands(
@@ -152,7 +152,7 @@ namespace ee4308::turtle
         }
 
         // Obstacle heuristic
-        float closest_obstacle = std::min_element(scan_ranges_.begin(), scan_ranges_.end());
+        float closest_obstacle = *std::min_element(scan_ranges_.begin(), scan_ranges_.end());
         double linear_vel;
 
         if (closest_obstacle < proximity_thres_) {
