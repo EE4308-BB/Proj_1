@@ -22,11 +22,11 @@ namespace ee4308::turtle
         return path_coord;
     }
 
-    std::vector<std::array<int, 2>> applySavitskyGolaySmoothing(const vector<array<int, 2>>& original_path, const vector<double>& polynomial_fit_kernel) {
+    std::vector<std::array<int, 2>> applySavitskyGolaySmoothing(const std::vector<std::array<int, 2>>& original_path, const std::vector<double>& polynomial_fit_kernel) {
         int n = original_path.size();
         int half_window = polynomial_fit_kernel.size() / 2;
 
-        vector<array<int, 2>> smoothed_path = path;
+        std::vector<std::array<int, 2>> smoothed_path = original_path;
 
         for (int i = half_window; i < n - half_window; ++i) {
             double new_x = 0.0, new_y = 0.0;
@@ -45,7 +45,7 @@ namespace ee4308::turtle
     }
 
     // ======================== Nav2 Planner Plugin ===============================
-    vector<double> Planner::generate_polynomial_fit_kernel(int sg_half_window_, int sg_order_) {
+    std::vector<double> Planner::generate_polynomial_fit_kernel(int sg_half_window_, int sg_order_) {
         int rows = 2 * sg_half_window_ + 1;
         int cols = sg_order_ + 1;
         Eigen::MatrixXd vandermondeMatrix(rows, cols);
@@ -59,7 +59,7 @@ namespace ee4308::turtle
 
         Eigen::MatrixXd vandermondeMatrix_t = vandermondeMatrix.transpose();
         Eigen::MatrixXd polynomial_fit_kernel = (vandermondeMatrix_t * vandermondeMatrix).inverse() * vandermondeMatrix_t;
-        vector<double> kernel(rows);
+        std::vector<double> kernel(rows);
 
         for (int i = 0; i < rows; ++i) {
             kernel[i] = polynomial_fit_kernel(0, i);
