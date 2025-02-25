@@ -37,8 +37,8 @@ namespace ee4308::turtle
         initParam(node_, plugin_name_ + ".max_linear_vel", max_linear_vel_, 0.22);
         initParam(node_, plugin_name_ + ".xy_goal_thres", xy_goal_thres_, 0.05);
         initParam(node_, plugin_name_ + ".yaw_goal_thres", yaw_goal_thres_, 0.25);
-        initParam(node_, plugin_name_ + ".curvature_thres", curvature_thres_, 0.25); // TODO: tune
-        initParam(node_, plugin_name_ + ".proximity_thres", proximity_thres_, 0.25); // TODO: tune
+        initParam(node_, plugin_name_ + ".curvature_thres", curvature_thres_, 0.5); // TODO: tune
+        initParam(node_, plugin_name_ + ".proximity_thres", proximity_thres_, 0.7); // TODO: tune
         initParam(node_, plugin_name_ + ".lookahead_gain", lookahead_gain_, 0.25); // TODO: tune
 
         // initialize topics
@@ -87,6 +87,8 @@ namespace ee4308::turtle
         double previous_distance = 1e9;
         size_t index_current_pose = 0;
 
+        std::cout << "Global_plan_size: " << global_plan_.poses.size() << std::endl;
+
         while (index_current_pose < global_plan_.poses.size()) {
             closest_pose = global_plan_.poses[index_current_pose];
 
@@ -107,6 +109,7 @@ namespace ee4308::turtle
             index_current_pose += 1;
             previous_distance = distance;
         }
+        std::cout << "index_current_pose: " << index_current_pose << std::endl;
 
         // From the closest point, find the lookahead point
 
@@ -130,6 +133,9 @@ namespace ee4308::turtle
             index_lookahead_pose += 1;
         }
 
+        std::cout << "index_lookahead_pose: " << index_lookahead_pose << std::endl;
+
+
         // Transform the lookahead point into the robot frame to get (x', y')
         double delta_x = lookahead_pose.pose.position.x - pose.pose.position.x;
         double delta_y = lookahead_pose.pose.position.y - pose.pose.position.y;
@@ -141,18 +147,22 @@ namespace ee4308::turtle
 
         // Calculate the curvature c
         double curvature = (2 * y_dash) / ((x_dash * x_dash) + (y_dash * y_dash));
-
+        std::cout << "Calculated curvature: " << curvature <<std::endl;
         double v_c;
 
         // Curvature heuristic
-        if (curvature > curvature_thres_) {
-            v_c = desired_linear_vel_ * curvature_thres_ / curvature;
+        if (std::abs(curvature) > curvature_thres_) {
+            v_c = desired_linear_vel_ * curvature_thres_ / std::abs(curvature);
         } else {
             v_c = desired_linear_vel_;
         }
 
+        std::cout << "V_c is: " << v_c << std::endl;
+
         // Obstacle heuristic
         float closest_obstacle = *std::min_element(scan_ranges_.begin(), scan_ranges_.end());
+        
+        std::cout << "closest dist: " << closest_obstacle << std::endl;
         double linear_vel;
 
         if (closest_obstacle < proximity_thres_) {
@@ -161,10 +171,17 @@ namespace ee4308::turtle
             linear_vel = v_c;
         }
 
+        std::cout << "linear_vel after obstacle heuristic: " << linear_vel << std::endl;
+
         // Vary lookahead
-        desired_lookahead_dist_ = abs(linear_vel) * lookahead_gain_;
+        desired_lookahead_dist_ = std::abs(linear_vel) * lookahead_gain_;
+        if (desired_lookahead_dist_ < 0.4) {
+            desired_lookahead_dist_ = 0.4;
+        }
+        std::cout << "desired_lookahead_dist_: " << desired_lookahead_dist_ << std::endl;
 
         double angular_vel = linear_vel * curvature;
+        std::cout << "angular_vel: " << angular_vel << std::endl;
 
         // Constrain omega to within the largest allowable angular speed
         if (std::abs(angular_vel) > max_angular_vel_ && angular_vel != 0.0) {
