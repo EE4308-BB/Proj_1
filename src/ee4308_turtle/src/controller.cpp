@@ -66,6 +66,25 @@ namespace ee4308::turtle
             return writeCmdVel(0, 0);
         }
 
+        std::cout << "Start Pose: (" << start_pose.x << ", " << start_pose.y << ")\n";
+        std::cout << "Goal Pose: (" << goal_pose.x << ", " << goal_pose.y << ")\n";
+
+        for (const auto &pose_stamped : global_plan.poses) {
+            double x = pose_stamped.pose.position.x;
+            double y = pose_stamped.pose.position.y;
+            coordinates.emplace_back(x, y); // Add coordinates to vector
+        }
+    
+        // Print the array of coordinates
+        std::cout << "Global Plan Coordinates: [";
+        for (size_t i = 0; i < coordinates.size(); ++i) {
+            std::cout << "(" << coordinates[i].first << ", " << coordinates[i].second << ")";
+            if (i < coordinates.size() - 1) {
+                std::cout << ", ";
+            }
+        }
+        std::cout << "]" << std::endl;
+
         // get goal pose (contains the "clicked" goal rotation and position)
         // Global_plan_ type is nav_msgs/msg/PoseStamped[]
         geometry_msgs::msg::PoseStamped goal_pose = global_plan_.poses.back();
