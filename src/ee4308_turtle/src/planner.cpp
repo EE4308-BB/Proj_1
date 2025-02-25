@@ -22,6 +22,28 @@ namespace ee4308::turtle
         return path_coord;
     }
 
+    std::vector<std::array<int, 2>> applySavitskyGolaySmoothing(const vector<array<int, 2>>& original_path, const vector<double>& polynomial_fit_kernel) {
+        int n = original_path.size();
+        int half_window = polynomial_fit_kernel.size() / 2;
+
+        vector<array<int, 2>> smoothed_path = path;
+
+        for (int i = half_window; i < n - half_window; ++i) {
+            double new_x = 0.0, new_y = 0.0;
+    
+            // Apply Savitzky-Golay kernel
+            for (int j = -half_window; j <= half_window; ++j) {
+                new_x += polynomial_fit_kernel[j + half_window] * original_path[i + j][0];
+                new_y += polynomial_fit_kernel[j + half_window] * original_path[i + j][1];
+            }
+    
+            // Store rounded smoothed values
+            smoothed_path[i] = {static_cast<int>(round(new_x)), static_cast<int>(round(new_y))};
+        }
+
+        return smoothed_path;
+    }
+
     // ======================== Nav2 Planner Plugin ===============================
     vector<double> Planner::generate_polynomial_fit_kernel(int sg_half_window_, int sg_order_) {
         int rows = 2 * sg_half_window_ + 1;
@@ -45,8 +67,6 @@ namespace ee4308::turtle
 
         return kernel;
     }
-
-
 
     void Planner::configure(
         const rclcpp_lifecycle::LifecycleNode::WeakPtr &parent,
@@ -126,8 +146,9 @@ namespace ee4308::turtle
                 continue;
             } else if (std::hypot(goal_mx - current_node->mx, goal_my - current_node->my) < 2) { // current node is goal (might want to implement tolerancing)
                 std::vector<std::array<int, 2>> path_coord = generatePathCoordinate(current_node->parent); // Check whether current_node or the parent is required, as writeToPath already used goal pose
+                std::vector<std::array<int, 2>> smoothed_path = applySavitskyGolaySmoothing(path_coord, polynomial_fit_kernel_);
+                //return writeToPath(smoothed_path, goal);
                 return writeToPath(path_coord, goal);
-                // TODO: Apply Savitsky Golay smoothing to the path
             }
             // Mark as expanded
             current_node->expanded = true;
