@@ -24,6 +24,9 @@ controller_server:
       max_linear_vel: 0.22
       xy_goal_thres: 0.05
       yaw_goal_thres: 0.25
+      curvature_thres: 0.25
+      proximity_thres: 0.25
+      lookahead_gain: 0.25
 
 
 planner_server:

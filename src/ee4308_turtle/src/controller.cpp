@@ -37,11 +37,18 @@ namespace ee4308::turtle
         initParam(node_, plugin_name_ + ".max_linear_vel", max_linear_vel_, 0.22);
         initParam(node_, plugin_name_ + ".xy_goal_thres", xy_goal_thres_, 0.05);
         initParam(node_, plugin_name_ + ".yaw_goal_thres", yaw_goal_thres_, 0.25);
+        initParam(node_, plugin_name_ + ".curvature_thres", curvature_thres_, 0.25); // TODO: tune
+        initParam(node_, plugin_name_ + ".proximity_thres", proximity_thres_, 0.25); // TODO: tune
+        initParam(node_, plugin_name_ + ".lookahead_gain", lookahead_gain_, 0.25); // TODO: tune
 
         // initialize topics
-        // sub_scan_ = node_->create_subscription<some msg type>(
-        //     "some topic", rclcpp::SensorDataQoS(),
-        //     std::bind(&Controller::some_callback, this, std::placeholders::_1));
+        sub_scan_ = node_->create_subscription<sensor_msgs::msg::LaserScan>(
+            "/scan", rclcpp::SensorDataQoS(),
+            std::bind(&Controller::lidarCallback, this, std::placeholders::_1));
+
+        void lidarCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
+            scan_ranges_ = msg->ranges;
+        }
     }
 
     geometry_msgs::msg::TwistStamped Controller::computeVelocityCommands(
@@ -135,9 +142,28 @@ namespace ee4308::turtle
         // Calculate the curvature c
         double curvature = (2 * y_dash) / ((x_dash * x_dash) + (y_dash * y_dash));
 
-        // Calc omega from v and c
+        double v_c;
 
-        double linear_vel = desired_linear_vel_;
+        // Curvature heuristic
+        if (curvature > curvature_thres_) {
+            v_c = desired_linear_vel_ * curvature_thres_ / curvature;
+        } else {
+            v_c = desired_linear_vel_;
+        }
+
+        // Obstacle heuristic
+        float closest_obstacle = std::min_element(scan_ranges_.begin(), scan_ranges_.end());
+        double linear_vel;
+
+        if (closest_obstacle < proximity_thres_) {
+            linear_vel = v_c * closest_obstacle / proximity_thres_;
+        } else {
+            linear_vel = v_c;
+        }
+
+        // Vary lookahead
+        desired_lookahead_dist_ = abs(linear_vel) * lookahead_gain_;
+
         double angular_vel = linear_vel * curvature;
 
         // Constrain omega to within the largest allowable angular speed
