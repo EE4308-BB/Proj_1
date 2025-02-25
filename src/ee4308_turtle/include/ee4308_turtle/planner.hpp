@@ -17,7 +17,7 @@
 #pragma once
 
 namespace ee4308::turtle
-{
+{   
     // ====================== Planner Node ===================
     struct PlannerNode
     {
@@ -31,6 +31,9 @@ namespace ee4308::turtle
 
         PlannerNode(int mx, int my);
     };
+
+    std::vector<std::array<int, 2>> generatePathCoordinate(PlannerNode* node);
+    bool is_valid_neighbor(int mx, int my, int max_access_cost_, nav2_costmap_2d::Costmap2D* costmap_);
 
     // ======================= Open List ===========================
     struct OpenListComparator

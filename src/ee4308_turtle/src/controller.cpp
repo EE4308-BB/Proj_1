@@ -59,7 +59,6 @@ namespace ee4308::turtle
             return writeCmdVel(0, 0);
         }
 
-
         // get goal pose (contains the "clicked" goal rotation and position)
         // Global_plan_ type is nav_msgs/msg/PoseStamped[]
         geometry_msgs::msg::PoseStamped goal_pose = global_plan_.poses.back();

@@ -33,7 +33,7 @@ planner_server:
     planner_plugins: ["GridBased"]
     GridBased:
       plugin: "ee4308::turtle::Planner"
-      max_access_cost: 255
+      max_access_cost: 245
       interpolation_distance: 0.05
       sg_half_window: 5
       sg_order: 3

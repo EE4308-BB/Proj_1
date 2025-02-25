@@ -1,7 +1,26 @@
 #include "ee4308_turtle/planner.hpp"
 
 namespace ee4308::turtle
-{
+{   
+    // ================ Potential Moves to Neighboring Cells  ======================
+    static const std::array<std::tuple<int, int>, 4> MOVES_ = {{
+        {0, 1}, // Right
+        {0, -1}, // Left
+        {1, 0}, // Down
+        {-1, 0} // Up
+    }};
+
+    std::vector<std::array<int, 2>> generatePathCoordinate(PlannerNode* node) {
+        std::vector<std::array<int, 2>> path_coord;
+        PlannerNode* current = node;
+        while (current != nullptr) {
+            path_coord.push_back({current->mx, current->my});
+            current = current->parent;
+        }
+
+        std::reverse(path_coord.begin(), path_coord.end());
+        return path_coord;
+    }
 
     // ======================== Nav2 Planner Plugin ===============================
     void Planner::configure(
@@ -23,40 +42,96 @@ namespace ee4308::turtle
         initParam(node_, plugin_name_ + ".sg_order", sg_order_, 3);
     }
 
+    bool is_valid_neighbor(int mx, int my, int max_access_cost_, nav2_costmap_2d::Costmap2D* costmap_) { 
+        int size_mx = costmap_->getSizeInCellsX();
+        int size_my = costmap_->getSizeInCellsY();
+
+        if (mx < 0 || my < 0 || mx >= size_mx || my >= size_my) {
+            return false; // Out of bounds
+        }
+
+        int cost = static_cast<int>(costmap_->getCost(mx, my));
+
+        if (cost >= max_access_cost_) { // Near an obstacle
+            return false; // Invalid node
+        }   
+        
+        return true;
+    }
+
     nav_msgs::msg::Path Planner::createPlan(
         const geometry_msgs::msg::PoseStamped &start,
         const geometry_msgs::msg::PoseStamped &goal)
     {
         // initializations
-        PlannerNodes nodes(costmap_->getSizeInCellsX(), costmap_->getSizeInCellsY());
-        OpenList open_list;
-        RayTracer ray_tracer;
+        int size_mx = costmap_->getSizeInCellsX();
+        int size_my = costmap_->getSizeInCellsY();
+        int movement_step_size = 1;
+        PlannerNodes nodes(size_mx, size_my); // Store nodes in 1D collapsed array
+        OpenList open_list; // Initialize empty open-list, implemented using pq // Essentially frontier
 
         int start_mx, start_my, goal_mx, goal_my;
         costmap_->worldToMapEnforceBounds(
             start.pose.position.x, start.pose.position.y,
-            start_mx, start_my);
+            start_mx, start_my); // convert start positions in world coord to map coord
+
         costmap_->worldToMapEnforceBounds(
             goal.pose.position.x, goal.pose.position.y,
-            goal_mx, goal_my);
+            goal_mx, goal_my); // convert goal positions in world coord to map coord
 
-        // draws a straight line from goal to start on the grid
-        // mimics how a vector is typically filled when iterating from the goal node to start node.
-        ray_tracer.init(goal_mx, goal_my, start_mx, start_my);
-        std::vector<std::array<int, 2>> coords;
-        while (rclcpp::ok())
-        {
-            std::array<int, 2> coord = ray_tracer.frontCell();
-            coords.push_back(coord);
-            if (ray_tracer.reached())
-                break; // check reached here so 
-            ray_tracer.next();
+        // All nodes in PlannerNodes are already defined with f, g, h as infinity
+        
+        PlannerNode *start_node = nodes.getNode(start_mx, start_my); // Pointer to start pos
+        
+        start_node->g = 0; // Initialize start node with 0 g-cost
+        start_node->h = std::hypot(goal_mx - start_mx, goal_my - start_my);
+        start_node->f = start_node->g + start_node->h;
+
+        open_list.queue(start_node); // Queue start node
+
+        //std::cout << "Start pos: " << start_mx << " " << start_my << std::endl;
+        //std::cout << "Goal pos: " << goal_mx << " " << goal_my << std::endl;
+        
+        while (!open_list.empty()) {
+            PlannerNode *current_node = open_list.pop();
+
+            if (current_node->expanded) { // node is explored
+                continue;
+            } else if (std::hypot(goal_mx - current_node->mx, goal_my - current_node->my) < 2) { // current node is goal (might want to implement tolerancing)
+                std::vector<std::array<int, 2>> path_coord = generatePathCoordinate(current_node->parent); // Check whether current_node or the parent is required, as writeToPath already used goal pose
+                return writeToPath(path_coord, goal);
+                // TODO: Apply Savitsky Golay smoothing to the path
+            }
+            // Mark as expanded
+            current_node->expanded = true;
+            //std::cout<< "Current pos: " << current_node->mx << " " << current_node->my << std::endl;
+
+            for (const std::tuple<int, int>& move : MOVES_) {
+                int dx = std::get<0>(move);
+                int dy = std::get<1>(move);
+                
+                int neighbor_mx = current_node->mx + dx * movement_step_size;
+                int neighbor_my = current_node->my + dy * movement_step_size;
+
+                if (!is_valid_neighbor(neighbor_mx, neighbor_my, max_access_cost_, costmap_)) {
+                    continue;
+                }
+                PlannerNode *neighbor_node = nodes.getNode(neighbor_mx, neighbor_my);
+                int cost_at_neighbor = static_cast<int>(costmap_->getCost(neighbor_mx, neighbor_my));
+                //std::cout << "Neighbor position: " << neighbor_mx << " " << neighbor_my << std::endl;
+                //std::cout << "Cost at neighbor: " << cost_at_neighbor << std::endl;
+                int new_g_cost = current_node->g + movement_step_size * (cost_at_neighbor + 1);
+                if (new_g_cost < neighbor_node->g) {
+                    neighbor_node->g = new_g_cost;
+                    neighbor_node->parent = current_node;
+                    neighbor_node->h = std::hypot(goal_mx - neighbor_mx, goal_my - neighbor_my);
+                    neighbor_node->f = neighbor_node-> g + neighbor_node->h;
+                    open_list.queue(neighbor_node);
+                }
+            }
         }
-
-        // reverse the coordinates because the convention for filling nav_msgs::msg::Path is from start to goal.
-        std::reverse(coords.begin(), coords.end());
-
-        return writeToPath(coords, goal);
+        std::vector<std::array<int, 2>> empty_path;
+        return writeToPath(empty_path, goal);
     }
 
     nav_msgs::msg::Path Planner::writeToPath(
