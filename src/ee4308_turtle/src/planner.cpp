@@ -23,6 +23,31 @@ namespace ee4308::turtle
     }
 
     // ======================== Nav2 Planner Plugin ===============================
+    vector<double> Planner::generate_polynomial_fit_kernel(int sg_half_window_, int sg_order_) {
+        int rows = 2 * sg_half_window_ + 1;
+        int cols = sg_order_ + 1;
+        Eigen::MatrixXd vandermondeMatrix(rows, cols);
+
+        for (int i = 0; i < rows; ++i) {
+            int x = i - sg_half_window_;
+            for (int j = 0; j < cols; ++j) {
+                vandermondeMatrix(i, j) = std::pow(x, j);
+            }
+        }
+
+        Eigen::MatrixXd vandermondeMatrix_t = vandermondeMatrix.transpose();
+        Eigen::MatrixXd polynomial_fit_kernel = (vandermondeMatrix_t * vandermondeMatrix).inverse() * vandermondeMatrix_t;
+        vector<double> kernel(rows);
+
+        for (int i = 0; i < rows; ++i) {
+            kernel[i] = polynomial_fit_kernel(0, i);
+        }
+
+        return kernel;
+    }
+
+
+
     void Planner::configure(
         const rclcpp_lifecycle::LifecycleNode::WeakPtr &parent,
         std::string name, const std::shared_ptr<tf2_ros::Buffer> tf,
@@ -40,6 +65,8 @@ namespace ee4308::turtle
         initParam(node_, plugin_name_ + ".interpolation_distance", interpolation_distance_, 0.05);
         initParam(node_, plugin_name_ + ".sg_half_window", sg_half_window_, 5);
         initParam(node_, plugin_name_ + ".sg_order", sg_order_, 3);
+
+        polynomial_fit_kernel_ = Planner::generate_polynomial_fit_kernel(sg_half_window_, sg_order_);
     }
 
     bool is_valid_neighbor(int mx, int my, int max_access_cost_, nav2_costmap_2d::Costmap2D* costmap_) { 
