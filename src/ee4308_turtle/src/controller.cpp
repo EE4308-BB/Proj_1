@@ -188,7 +188,7 @@ namespace ee4308::turtle
         if (std::abs(angular_vel) > max_angular_vel_) {
             angular_vel = (angular_vel / std::abs(angular_vel)) * max_angular_vel_;
         } else if (std::abs(angular_vel) < 0.1) {
-            angular_vel = 0;
+            angular_vel = 0.0;
         }
 
         // Constrain v to within the largest allowable linear speed
