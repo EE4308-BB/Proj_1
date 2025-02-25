@@ -36,7 +36,7 @@ namespace ee4308::turtle
         global_frame_id_ = costmap_ros->getGlobalFrameID();
 
         // initialize parameters
-        initParam(node_, plugin_name_ + ".max_access_cost", max_access_cost_, 210);
+        initParam(node_, plugin_name_ + ".max_access_cost", max_access_cost_, 255);
         initParam(node_, plugin_name_ + ".interpolation_distance", interpolation_distance_, 0.05);
         initParam(node_, plugin_name_ + ".sg_half_window", sg_half_window_, 5);
         initParam(node_, plugin_name_ + ".sg_order", sg_order_, 3);
@@ -98,7 +98,7 @@ namespace ee4308::turtle
             if (current_node->expanded) { // node is explored
                 continue;
             } else if (std::hypot(goal_mx - current_node->mx, goal_my - current_node->my) < 2) { // current node is goal (might want to implement tolerancing)
-                std::vector<std::array<int, 2>> path_coord = generatePathCoordinate(current_node); // Check whether current_node or the parent is required, as writeToPath already used goal pose
+                std::vector<std::array<int, 2>> path_coord = generatePathCoordinate(current_node->parent); // Check whether current_node or the parent is required, as writeToPath already used goal pose
                 return writeToPath(path_coord, goal);
                 // TODO: Apply Savitsky Golay smoothing to the path
             }
