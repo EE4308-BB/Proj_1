@@ -22,7 +22,52 @@ namespace ee4308::turtle
         return path_coord;
     }
 
+    std::vector<std::array<int, 2>> applySavitskyGolaySmoothing(const std::vector<std::array<int, 2>>& original_path, const std::vector<double>& polynomial_fit_kernel) {
+        int n = original_path.size();
+        int half_window = polynomial_fit_kernel.size() / 2;
+
+        std::vector<std::array<int, 2>> smoothed_path = original_path;
+
+        for (int i = half_window; i < n - half_window; ++i) {
+            double new_x = 0.0, new_y = 0.0;
+    
+            // Apply Savitzky-Golay kernel
+            for (int j = -half_window; j <= half_window; ++j) {
+                new_x += polynomial_fit_kernel[j + half_window] * original_path[i + j][0];
+                new_y += polynomial_fit_kernel[j + half_window] * original_path[i + j][1];
+            }
+    
+            // Store rounded smoothed values
+            smoothed_path[i] = {static_cast<int>(round(new_x)), static_cast<int>(round(new_y))};
+        }
+
+        return smoothed_path;
+    }
+
     // ======================== Nav2 Planner Plugin ===============================
+    std::vector<double> Planner::generate_polynomial_fit_kernel(int sg_half_window_, int sg_order_) {
+        int rows = 2 * sg_half_window_ + 1;
+        int cols = sg_order_ + 1;
+        Eigen::MatrixXd vandermondeMatrix(rows, cols);
+
+        for (int i = 0; i < rows; ++i) {
+            int x = i - sg_half_window_;
+            for (int j = 0; j < cols; ++j) {
+                vandermondeMatrix(i, j) = std::pow(x, j);
+            }
+        }
+
+        Eigen::MatrixXd vandermondeMatrix_t = vandermondeMatrix.transpose();
+        Eigen::MatrixXd polynomial_fit_kernel = (vandermondeMatrix_t * vandermondeMatrix).inverse() * vandermondeMatrix_t;
+        std::vector<double> kernel(rows);
+
+        for (int i = 0; i < rows; ++i) {
+            kernel[i] = polynomial_fit_kernel(0, i);
+        }
+
+        return kernel;
+    }
+
     void Planner::configure(
         const rclcpp_lifecycle::LifecycleNode::WeakPtr &parent,
         std::string name, const std::shared_ptr<tf2_ros::Buffer> tf,
@@ -40,6 +85,8 @@ namespace ee4308::turtle
         initParam(node_, plugin_name_ + ".interpolation_distance", interpolation_distance_, 0.05);
         initParam(node_, plugin_name_ + ".sg_half_window", sg_half_window_, 5);
         initParam(node_, plugin_name_ + ".sg_order", sg_order_, 3);
+
+        polynomial_fit_kernel_ = Planner::generate_polynomial_fit_kernel(sg_half_window_, sg_order_);
     }
 
     bool is_valid_neighbor(int mx, int my, int max_access_cost_, nav2_costmap_2d::Costmap2D* costmap_) { 
@@ -99,8 +146,9 @@ namespace ee4308::turtle
                 continue;
             } else if (std::hypot(goal_mx - current_node->mx, goal_my - current_node->my) < 2) { // current node is goal (might want to implement tolerancing)
                 std::vector<std::array<int, 2>> path_coord = generatePathCoordinate(current_node->parent); // Check whether current_node or the parent is required, as writeToPath already used goal pose
+                std::vector<std::array<int, 2>> smoothed_path = applySavitskyGolaySmoothing(path_coord, polynomial_fit_kernel_);
+                //return writeToPath(smoothed_path, goal);
                 return writeToPath(path_coord, goal);
-                // TODO: Apply Savitsky Golay smoothing to the path
             }
             // Mark as expanded
             current_node->expanded = true;

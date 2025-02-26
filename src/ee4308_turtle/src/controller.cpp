@@ -37,11 +37,18 @@ namespace ee4308::turtle
         initParam(node_, plugin_name_ + ".max_linear_vel", max_linear_vel_, 0.22);
         initParam(node_, plugin_name_ + ".xy_goal_thres", xy_goal_thres_, 0.05);
         initParam(node_, plugin_name_ + ".yaw_goal_thres", yaw_goal_thres_, 0.25);
+        initParam(node_, plugin_name_ + ".curvature_thres", curvature_thres_, 0.5); // TODO: tune
+        initParam(node_, plugin_name_ + ".proximity_thres", proximity_thres_, 0.7); // TODO: tune
+        initParam(node_, plugin_name_ + ".lookahead_gain", lookahead_gain_, 0.25); // TODO: tune
 
         // initialize topics
-        // sub_scan_ = node_->create_subscription<some msg type>(
-        //     "some topic", rclcpp::SensorDataQoS(),
-        //     std::bind(&Controller::some_callback, this, std::placeholders::_1));
+        sub_scan_ = node_->create_subscription<sensor_msgs::msg::LaserScan>(
+            "/scan", rclcpp::SensorDataQoS(),
+            std::bind(&Controller::lidarCallback, this, std::placeholders::_1));
+    }
+
+    void Controller::lidarCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
+        scan_ranges_ = msg->ranges;
     }
 
     geometry_msgs::msg::TwistStamped Controller::computeVelocityCommands(
@@ -59,6 +66,7 @@ namespace ee4308::turtle
             return writeCmdVel(0, 0);
         }
 
+
         // get goal pose (contains the "clicked" goal rotation and position)
         // Global_plan_ type is nav_msgs/msg/PoseStamped[]
         geometry_msgs::msg::PoseStamped goal_pose = global_plan_.poses.back();
@@ -74,58 +82,50 @@ namespace ee4308::turtle
         }
 
         // Find the point along the path that is closest to the robot.
-
         geometry_msgs::msg::PoseStamped closest_pose;
-
-        double previous_distance = 1e9;
-        size_t index_current_pose = 0;
-
-        while (index_current_pose < global_plan_.poses.size()) {
-            closest_pose = global_plan_.poses[index_current_pose];
-
-            double distance = std::hypot(
-                closest_pose.pose.position.x - pose.pose.position.x,
-                closest_pose.pose.position.y - pose.pose.position.y
-            );
-
-            // If distance decreases, the current pose is still behind the robot
-            if (distance >= previous_distance) {
-                index_current_pose -= 1;
+        size_t i;
+        double prev_dist = 1e9;
+        for (i = 0; i < global_plan_.poses.size(); i++)
+        {
+            auto point_pose = global_plan_.poses[i];
+            double point_pose_x = point_pose.pose.position.x;
+            double point_pose_y = point_pose.pose.position.y;
+            double dist = std::hypot(point_pose_x - pose.pose.position.x, point_pose_y - pose.pose.position.y);
+            if (dist < prev_dist)
+            {
+                prev_dist = dist;
+            } else if (i > 0) {
+                closest_pose = global_plan_.poses[i - 1];
                 break;
-            
-            } else if (index_current_pose == global_plan_.poses.size() - 1) {
+            } else {
+                closest_pose = global_plan_.poses[i];
                 break;
             }
-
-            index_current_pose += 1;
-            previous_distance = distance;
         }
-
+        
         // From the closest point, find the lookahead point
-
-        geometry_msgs::msg::PoseStamped lookahead_pose;
-        size_t index_lookahead_pose = index_current_pose;
-
-        while (index_lookahead_pose < global_plan_.poses.size()) {
-            lookahead_pose = global_plan_.poses[index_lookahead_pose];
-
-            double distance = std::hypot(
-                lookahead_pose.pose.position.x - closest_pose.pose.position.x,
-                lookahead_pose.pose.position.y - closest_pose.pose.position.y
-            );
-
-            if (distance >= desired_lookahead_dist_) {
-                break;
-            } else if (index_lookahead_pose == global_plan_.poses.size() - 1) {
-                lookahead_pose = goal_pose;
-                break;
+        geometry_msgs::msg::PoseStamped lookahead_pose = goal_pose;
+        for (size_t j = i + 1; j < global_plan_.poses.size(); j++) 
+        {
+            auto point_pose = global_plan_.poses[j];
+            double point_pose_x = point_pose.pose.position.x;
+            double point_pose_y = point_pose.pose.position.y;
+            double dist = std::hypot(point_pose_x - closest_pose.pose.position.x, 
+                             point_pose_y - closest_pose.pose.position.y);
+            
+            if (dist >= desired_lookahead_dist_)
+            {
+                lookahead_pose = point_pose;
+                break; // found lookahead, so gonna stop iterating
             }
-            index_lookahead_pose += 1;
         }
 
         // Transform the lookahead point into the robot frame to get (x', y')
         double delta_x = lookahead_pose.pose.position.x - pose.pose.position.x;
         double delta_y = lookahead_pose.pose.position.y - pose.pose.position.y;
+
+        //std::cout << "delta_x " << delta_x << std::endl;
+        //std::cout << "delta_y " << delta_y << std::endl;
 
         double phi_r = getYawFromQuaternion(pose.pose.orientation);
 
@@ -133,24 +133,71 @@ namespace ee4308::turtle
         double y_dash = delta_y * std::cos(phi_r) - delta_x * std::sin(phi_r);
 
         // Calculate the curvature c
-        double curvature = (2 * y_dash) / ((x_dash * x_dash) + (y_dash * y_dash));
+        double denom_ =  ((x_dash * x_dash) + (y_dash * y_dash)) + 1e-6; // to prevent dividing by 0, if somehow it happens
+        double curvature = (2 * y_dash) / denom_;
+        //std::cout << "Calculated curvature: " << curvature <<std::endl;
+        double v_c;
+        double angular_vel = desired_linear_vel_ * curvature;
 
-        // Calc omega from v and c
+        // Curvature heuristic
+        if (std::abs(curvature) > curvature_thres_) {
+            v_c = desired_linear_vel_ * curvature_thres_ / std::abs(curvature);
+        } else {
+            v_c = desired_linear_vel_;
+        }
 
-        double linear_vel = desired_linear_vel_;
-        double angular_vel = linear_vel * curvature;
+        //std::cout << "V_c is: " << v_c << std::endl;
+
+        // Obstacle heuristic
+        
+        float closest_obstacle = proximity_thres_;
+        //if (!scan_ranges_.empty()) {
+        //    float closest_obstacle = 1e9;
+        //    for (float range : scan_ranges_) {
+        //        if (!std::isnan(range) && !std::isinf(range)) {
+        //            if (range < closest_obstacle) {{
+        //                closest_obstacle = range;
+        //            }}
+        //        }
+        //    }
+        //} else {
+        //    closest_obstacle = proximity_thres_;
+        //}
+
+        //std::cout << "closest dist: " << closest_obstacle << std::endl;
+        double linear_vel;
+
+        if (closest_obstacle < proximity_thres_) {
+            linear_vel = v_c * closest_obstacle / proximity_thres_;
+        } else {
+            linear_vel = v_c;
+        }
+
+        //std::cout << "linear_vel after obstacle heuristic: " << linear_vel << std::endl;
+
+        // Vary lookahead
+        //desired_lookahead_dist_ = std::abs(linear_vel) * lookahead_gain_;
+        if (desired_lookahead_dist_ < 0.3) {
+            desired_lookahead_dist_ = 0.3;
+        }
+        //std::cout << "desired_lookahead_dist_: " << desired_lookahead_dist_ << std::endl;
+
+        //std::cout << "angular_vel: " << angular_vel << std::endl;
 
         // Constrain omega to within the largest allowable angular speed
-        if (std::abs(angular_vel) > max_angular_vel_ && angular_vel != 0.0) {
+        if (std::abs(angular_vel) > max_angular_vel_) {
             angular_vel = (angular_vel / std::abs(angular_vel)) * max_angular_vel_;
+        } else if (std::abs(angular_vel) < 0.1) {
+            angular_vel = 0.0;
         }
 
         // Constrain v to within the largest allowable linear speed
-        if (std::abs(linear_vel) > desired_linear_vel_ && linear_vel != 0.0) {
+        if (std::abs(linear_vel) > desired_linear_vel_) {
             linear_vel = (linear_vel / std::abs(linear_vel)) * desired_linear_vel_;
         }
 
         return writeCmdVel(linear_vel, angular_vel);
+        
     }
 
     geometry_msgs::msg::TwistStamped Controller::writeCmdVel(double linear_vel, double angular_vel)

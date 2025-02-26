@@ -95,8 +95,10 @@ namespace ee4308::turtle
         double interpolation_distance_;
         int sg_half_window_;
         int sg_order_;
+        std::vector<double> polynomial_fit_kernel_;
         
         nav_msgs::msg::Path writeToPath(std::vector<std::array<int, 2>> coords, geometry_msgs::msg::PoseStamped goal);
+        std::vector<double> generate_polynomial_fit_kernel(int sg_half_window_, int sg_order_);
     };
 
 }
