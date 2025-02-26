@@ -153,23 +153,25 @@ namespace ee4308::turtle
         }
 
         //std::cout << "V_c is: " << v_c << std::endl;
-        double angular_vel = desired_linear_vel_ * curvature; // TODO: double check this
-
+        double angular_vel = desired_linear_vel_ * curvature; 
         // Obstacle heuristic
         
-        float closest_obstacle = proximity_thres_;
-        //if (!scan_ranges_.empty()) {
-        //    float closest_obstacle = 1e9;
-        //    for (float range : scan_ranges_) {
-        //        if (!std::isnan(range) && !std::isinf(range)) {
-        //            if (range < closest_obstacle) {{
-        //                closest_obstacle = range;
-        //            }}
-        //        }
-        //    }
-        //} else {
-        //    closest_obstacle = proximity_thres_;
-        //}
+        float closest_obstacle;;
+        if (!scan_ranges_.empty()) {
+            closest_obstacle = 1000.0;
+            for (float range : scan_ranges_) {
+                if (!std::isnan(range) && !std::isinf(range)) {
+                    //std::cout << "Current range: " << range << std::endl;
+                    if (range < closest_obstacle) {
+                        //std::cout <<"here"<<std::endl;
+                        closest_obstacle = range;
+                    }
+                }
+            }
+        } else {
+            //std::cout << "Default dist used" << std::endl;
+            closest_obstacle = proximity_thres_;
+        }
 
         //std::cout << "closest dist: " << closest_obstacle << std::endl;
         double linear_vel;
@@ -183,7 +185,7 @@ namespace ee4308::turtle
         //std::cout << "linear_vel after obstacle heuristic: " << linear_vel << std::endl;
 
         // Vary lookahead
-        //desired_lookahead_dist_ = std::abs(linear_vel) * lookahead_gain_;
+        desired_lookahead_dist_ = std::abs(linear_vel) * lookahead_gain_;
         if (desired_lookahead_dist_ < 0.3) {
             desired_lookahead_dist_ = 0.3;
         }
