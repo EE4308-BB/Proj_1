@@ -124,10 +124,6 @@ namespace ee4308::turtle
         double delta_x = lookahead_pose.pose.position.x - pose.pose.position.x;
         double delta_y = lookahead_pose.pose.position.y - pose.pose.position.y;
 
-        double lookahead_angle = std::atan2(delta_y, delta_x);
-        double heading_error = std::atan2(std::sin(lookahead_angle - phi_r), std::cos(lookahead_angle - phi_r));
-        bool move_backward = (std::abs(heading_error) > M_PI_2);
-
         //std::cout << "delta_x " << delta_x << std::endl;
         //std::cout << "delta_y " << delta_y << std::endl;
 
@@ -135,6 +131,10 @@ namespace ee4308::turtle
 
         double x_dash = delta_x * std::cos(phi_r) + delta_y * std::sin(phi_r);
         double y_dash = delta_y * std::cos(phi_r) - delta_x * std::sin(phi_r);
+
+        double lookahead_angle = std::atan2(delta_y, delta_x);
+        double heading_error = std::atan2(std::sin(lookahead_angle - phi_r), std::cos(lookahead_angle - phi_r));
+        bool move_backward = (std::abs(heading_error) > M_PI_2);
 
         // Calculate the curvature c
         double denom_ =  ((x_dash * x_dash) + (y_dash * y_dash)) + 1e-6; // to prevent dividing by 0, if somehow it happens
