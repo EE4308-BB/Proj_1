@@ -124,6 +124,10 @@ namespace ee4308::turtle
         double delta_x = lookahead_pose.pose.position.x - pose.pose.position.x;
         double delta_y = lookahead_pose.pose.position.y - pose.pose.position.y;
 
+        double lookahead_angle = std::atan2(delta_y, delta_x);
+        double heading_error = std::atan2(std::sin(lookahead_angle - phi_r), std::cos(lookahead_angle - phi_r));
+        bool move_backward = (std::abs(heading_error) > M_PI_2);
+
         //std::cout << "delta_x " << delta_x << std::endl;
         //std::cout << "delta_y " << delta_y << std::endl;
 
@@ -136,17 +140,20 @@ namespace ee4308::turtle
         double denom_ =  ((x_dash * x_dash) + (y_dash * y_dash)) + 1e-6; // to prevent dividing by 0, if somehow it happens
         double curvature = (2 * y_dash) / denom_;
         //std::cout << "Calculated curvature: " << curvature <<std::endl;
-        double v_c;
-        double angular_vel = desired_linear_vel_ * curvature;
+        double v_c = desired_linear_vel_;
+
+        if (move_backward) {
+            v_c = -desired_linear_vel_;  // Reverse velocity
+            curvature = -curvature;      // Flip turning direction
+        }
 
         // Curvature heuristic
         if (std::abs(curvature) > curvature_thres_) {
-            v_c = desired_linear_vel_ * curvature_thres_ / std::abs(curvature);
-        } else {
-            v_c = desired_linear_vel_;
+            v_c *= curvature_thres_ / std::abs(curvature);
         }
 
         //std::cout << "V_c is: " << v_c << std::endl;
+        double angular_vel = desired_linear_vel_ * curvature; // TODO: double check this
 
         // Obstacle heuristic
         
