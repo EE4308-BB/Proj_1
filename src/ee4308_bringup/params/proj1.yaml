@@ -38,7 +38,7 @@ planner_server:
       plugin: "ee4308::turtle::Planner"
       max_access_cost: 245
       interpolation_distance: 0.05
-      sg_half_window: 5
+      sg_half_window: 10
       sg_order: 3
   
 map_server:
