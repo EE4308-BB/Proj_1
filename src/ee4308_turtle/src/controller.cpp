@@ -132,37 +132,46 @@ namespace ee4308::turtle
         double x_dash = delta_x * std::cos(phi_r) + delta_y * std::sin(phi_r);
         double y_dash = delta_y * std::cos(phi_r) - delta_x * std::sin(phi_r);
 
+        double lookahead_angle = std::atan2(delta_y, delta_x);
+        double heading_error = std::atan2(std::sin(lookahead_angle - phi_r), std::cos(lookahead_angle - phi_r));
+        bool move_backward = (std::abs(heading_error) > M_PI_2);
+
         // Calculate the curvature c
         double denom_ =  ((x_dash * x_dash) + (y_dash * y_dash)) + 1e-6; // to prevent dividing by 0, if somehow it happens
         double curvature = (2 * y_dash) / denom_;
         //std::cout << "Calculated curvature: " << curvature <<std::endl;
-        double v_c;
-        double angular_vel = desired_linear_vel_ * curvature;
+        double v_c = desired_linear_vel_;
+
+        if (move_backward) {
+            v_c = -desired_linear_vel_;  // Reverse velocity
+            curvature = -curvature;      // Flip turning direction
+        }
 
         // Curvature heuristic
         if (std::abs(curvature) > curvature_thres_) {
-            v_c = desired_linear_vel_ * curvature_thres_ / std::abs(curvature);
-        } else {
-            v_c = desired_linear_vel_;
+            v_c *= curvature_thres_ / std::abs(curvature);
         }
 
         //std::cout << "V_c is: " << v_c << std::endl;
-
+        double angular_vel = desired_linear_vel_ * curvature; 
         // Obstacle heuristic
         
-        float closest_obstacle = proximity_thres_;
-        //if (!scan_ranges_.empty()) {
-        //    float closest_obstacle = 1e9;
-        //    for (float range : scan_ranges_) {
-        //        if (!std::isnan(range) && !std::isinf(range)) {
-        //            if (range < closest_obstacle) {{
-        //                closest_obstacle = range;
-        //            }}
-        //        }
-        //    }
-        //} else {
-        //    closest_obstacle = proximity_thres_;
-        //}
+        float closest_obstacle;;
+        if (!scan_ranges_.empty()) {
+            closest_obstacle = 1000.0;
+            for (float range : scan_ranges_) {
+                if (!std::isnan(range) && !std::isinf(range)) {
+                    //std::cout << "Current range: " << range << std::endl;
+                    if (range < closest_obstacle) {
+                        //std::cout <<"here"<<std::endl;
+                        closest_obstacle = range;
+                    }
+                }
+            }
+        } else {
+            //std::cout << "Default dist used" << std::endl;
+            closest_obstacle = proximity_thres_;
+        }
 
         //std::cout << "closest dist: " << closest_obstacle << std::endl;
         double linear_vel;
@@ -176,7 +185,7 @@ namespace ee4308::turtle
         //std::cout << "linear_vel after obstacle heuristic: " << linear_vel << std::endl;
 
         // Vary lookahead
-        //desired_lookahead_dist_ = std::abs(linear_vel) * lookahead_gain_;
+        desired_lookahead_dist_ = std::abs(linear_vel) * lookahead_gain_;
         if (desired_lookahead_dist_ < 0.3) {
             desired_lookahead_dist_ = 0.3;
         }
