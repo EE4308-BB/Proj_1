@@ -88,7 +88,7 @@ namespace ee4308::turtle
             if (std::abs(yaw_error) < yaw_goal_thres_) { //need abs cos atan2 can give negative value also, it jsut finds shortest angle
                 return writeCmdVel(0, 0);  // Stop only if both position and yaw are aligned
             } else {
-                return writeCmdVel(0, max_angular_vel_); 
+                return writeCmdVel(0, max_angular_vel_ / 3); 
                 //return writeCmdVel(0, std::clamp(yaw_error * 2.0, -max_angular_vel_, max_angular_vel_)); 
             }
         }
@@ -136,16 +136,6 @@ namespace ee4308::turtle
         double delta_x = lookahead_pose.pose.position.x - pose.pose.position.x;
         double delta_y = lookahead_pose.pose.position.y - pose.pose.position.y;
 
-        //double lookahead_angle = atan2(delta_x, delta_y);
-        //double path_yaw_error = robot_yaw - lookahead_angle;
-        //path_yaw_error = std::atan2(std::sin(path_yaw_error), std::cos(path_yaw_error));
-
-        //if (path_yaw_error> M_PI/2)
-        //{
-        //    return writeCmdVel(0, 1);
-
-        //}
-
         //std::cout << "delta_x " << delta_x << std::endl;
         //std::cout << "delta_y " << delta_y << std::endl;
 
@@ -164,17 +154,12 @@ namespace ee4308::turtle
 
         //std::cout << "Calculated curvature: " << curvature <<std::endl;
 
-
-        //double v_c;
-        //double angular_vel = desired_linear_vel_ * curvature;
-
         double v_c = desired_linear_vel_;
 
         if (move_backward) {
             v_c = -desired_linear_vel_;  // Reverse velocity
             curvature = -curvature;      // Flip turning direction
         }
-
 
         // Curvature heuristic
         if (std::abs(curvature) > curvature_thres_) {
@@ -183,8 +168,8 @@ namespace ee4308::turtle
 
         //std::cout << "V_c is: " << v_c << std::endl;
         double angular_vel = desired_linear_vel_ * curvature; 
-        // Obstacle heuristic
         
+        // Obstacle heuristic
         float closest_obstacle;;
         if (!scan_ranges_.empty()) {
             closest_obstacle = 1000.0;
@@ -211,7 +196,6 @@ namespace ee4308::turtle
             linear_vel = v_c;
         }
 
-
         //std::cout << "linear_vel after obstacle heuristic: " << linear_vel << std::endl;
 
         // Vary lookahead
@@ -220,7 +204,6 @@ namespace ee4308::turtle
             desired_lookahead_dist_ = 0.3;
         }
         //std::cout << "desired_lookahead_dist_: " << desired_lookahead_dist_ << std::endl;
-
 
         //std::cout << "angular_vel: " << angular_vel << std::endl;
 
