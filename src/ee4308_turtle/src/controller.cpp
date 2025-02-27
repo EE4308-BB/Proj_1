@@ -88,7 +88,7 @@ namespace ee4308::turtle
             if (std::abs(yaw_error) < yaw_goal_thres_) { //need abs cos atan2 can give negative value also, it jsut finds shortest angle
                 return writeCmdVel(0, 0);  // Stop only if both position and yaw are aligned
             } else {
-                return writeCmdVel(0, max_angular_vel); 
+                return writeCmdVel(0, max_angular_vel_); 
                 //return writeCmdVel(0, std::clamp(yaw_error * 2.0, -max_angular_vel_, max_angular_vel_)); 
             }
         }
