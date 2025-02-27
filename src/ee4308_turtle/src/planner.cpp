@@ -3,7 +3,11 @@
 namespace ee4308::turtle
 {   
     // ================ Potential Moves to Neighboring Cells  ======================
-    static const std::array<std::tuple<int, int>, 4> MOVES_ = {{
+    static const std::array<std::tuple<int, int>, 8> MOVES_ = {{
+        {1, -1},
+        {1, 1},
+        {-1, 1},
+        {-1, -1},
         {0, 1}, // Right
         {0, -1}, // Left
         {1, 0}, // Down
@@ -83,8 +87,8 @@ namespace ee4308::turtle
         // initialize parameters
         initParam(node_, plugin_name_ + ".max_access_cost", max_access_cost_, 255);
         initParam(node_, plugin_name_ + ".interpolation_distance", interpolation_distance_, 0.05);
-        initParam(node_, plugin_name_ + ".sg_half_window", sg_half_window_, 5);
-        initParam(node_, plugin_name_ + ".sg_order", sg_order_, 3);
+        initParam(node_, plugin_name_ + ".sg_half_window", sg_half_window_, 14);
+        initParam(node_, plugin_name_ + ".sg_order", sg_order_, 4);
 
         polynomial_fit_kernel_ = Planner::generate_polynomial_fit_kernel(sg_half_window_, sg_order_);
     }
@@ -147,8 +151,8 @@ namespace ee4308::turtle
             } else if (std::hypot(goal_mx - current_node->mx, goal_my - current_node->my) < 2) { // current node is goal (might want to implement tolerancing)
                 std::vector<std::array<int, 2>> path_coord = generatePathCoordinate(current_node->parent); // Check whether current_node or the parent is required, as writeToPath already used goal pose
                 std::vector<std::array<int, 2>> smoothed_path = applySavitskyGolaySmoothing(path_coord, polynomial_fit_kernel_);
-                //return writeToPath(smoothed_path, goal);
-                return writeToPath(path_coord, goal);
+                return writeToPath(smoothed_path, goal);
+                //return writeToPath(path_coord, goal);
             }
             // Mark as expanded
             current_node->expanded = true;
@@ -157,7 +161,7 @@ namespace ee4308::turtle
             for (const std::tuple<int, int>& move : MOVES_) {
                 int dx = std::get<0>(move);
                 int dy = std::get<1>(move);
-                
+                double step_dist = std::hypot(dx, dy);
                 int neighbor_mx = current_node->mx + dx * movement_step_size;
                 int neighbor_my = current_node->my + dy * movement_step_size;
 
@@ -168,7 +172,7 @@ namespace ee4308::turtle
                 int cost_at_neighbor = static_cast<int>(costmap_->getCost(neighbor_mx, neighbor_my));
                 //std::cout << "Neighbor position: " << neighbor_mx << " " << neighbor_my << std::endl;
                 //std::cout << "Cost at neighbor: " << cost_at_neighbor << std::endl;
-                int new_g_cost = current_node->g + movement_step_size * (cost_at_neighbor + 1);
+                double new_g_cost = current_node->g + movement_step_size * step_dist * (cost_at_neighbor + 1);
                 if (new_g_cost < neighbor_node->g) {
                     neighbor_node->g = new_g_cost;
                     neighbor_node->parent = current_node;
