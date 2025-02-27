@@ -76,9 +76,21 @@ namespace ee4308::turtle
             goal_pose.pose.position.y - pose.pose.position.y
         );
 
+        double goal_yaw = getYawFromQuaternion(goal_pose.pose.orientation);
+        double robot_yaw = getYawFromQuaternion(pose.pose.orientation);
+        double yaw_error = goal_yaw - robot_yaw;
+
         // Check if already arrived at goal
         if (xy_goal_thres_ > distance) {
-            return writeCmdVel(0, 0);
+            
+            yaw_error = std::atan2(std::sin(yaw_error), std::cos(yaw_error));
+            
+            if (std::abs(yaw_error) < yaw_goal_thres_) { //need abs cos atan2 can give negative value also, it jsut finds shortest angle
+                return writeCmdVel(0, 0);  // Stop only if both position and yaw are aligned
+            } else {
+                return writeCmdVel(0, max_angular_vel); 
+                //return writeCmdVel(0, std::clamp(yaw_error * 2.0, -max_angular_vel_, max_angular_vel_)); 
+            }
         }
 
         // Find the point along the path that is closest to the robot.
@@ -124,6 +136,16 @@ namespace ee4308::turtle
         double delta_x = lookahead_pose.pose.position.x - pose.pose.position.x;
         double delta_y = lookahead_pose.pose.position.y - pose.pose.position.y;
 
+        //double lookahead_angle = atan2(delta_x, delta_y);
+        //double path_yaw_error = robot_yaw - lookahead_angle;
+        //path_yaw_error = std::atan2(std::sin(path_yaw_error), std::cos(path_yaw_error));
+
+        //if (path_yaw_error> M_PI/2)
+        //{
+        //    return writeCmdVel(0, 1);
+
+        //}
+
         //std::cout << "delta_x " << delta_x << std::endl;
         //std::cout << "delta_y " << delta_y << std::endl;
 
@@ -139,13 +161,20 @@ namespace ee4308::turtle
         // Calculate the curvature c
         double denom_ =  ((x_dash * x_dash) + (y_dash * y_dash)) + 1e-6; // to prevent dividing by 0, if somehow it happens
         double curvature = (2 * y_dash) / denom_;
+
         //std::cout << "Calculated curvature: " << curvature <<std::endl;
+
+
+        //double v_c;
+        //double angular_vel = desired_linear_vel_ * curvature;
+
         double v_c = desired_linear_vel_;
 
         if (move_backward) {
             v_c = -desired_linear_vel_;  // Reverse velocity
             curvature = -curvature;      // Flip turning direction
         }
+
 
         // Curvature heuristic
         if (std::abs(curvature) > curvature_thres_) {
@@ -182,6 +211,7 @@ namespace ee4308::turtle
             linear_vel = v_c;
         }
 
+
         //std::cout << "linear_vel after obstacle heuristic: " << linear_vel << std::endl;
 
         // Vary lookahead
@@ -190,6 +220,7 @@ namespace ee4308::turtle
             desired_lookahead_dist_ = 0.3;
         }
         //std::cout << "desired_lookahead_dist_: " << desired_lookahead_dist_ << std::endl;
+
 
         //std::cout << "angular_vel: " << angular_vel << std::endl;
 
