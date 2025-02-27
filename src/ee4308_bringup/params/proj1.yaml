@@ -23,7 +23,7 @@ controller_server:
       max_angular_vel: 1.0
       max_linear_vel: 0.22
       xy_goal_thres: 0.05
-      yaw_goal_thres: 0.25
+      yaw_goal_thres: 0.05
       curvature_thres: 7.0
       proximity_thres: 0.6
       lookahead_gain: 4.0
