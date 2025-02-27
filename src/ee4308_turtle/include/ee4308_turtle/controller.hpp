@@ -49,12 +49,15 @@ namespace ee4308::turtle
         double max_linear_vel_;
         double xy_goal_thres_;
         double yaw_goal_thres_;
+        double proximity_thres_;
+        double curvature_thres_;
+        double lookahead_gain_;
 
         // topics 
         nav_msgs::msg::Path global_plan_;
         std::vector<float> scan_ranges_;
-        // rclcpp::Subscription<some msg type>::SharedPtr sub_scan_;
-        // void some callback(some msg type::SharedPtr msg);
+        rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr sub_scan_;
+        void lidarCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg);
 
         // other "private" functions
         geometry_msgs::msg::TwistStamped writeCmdVel(double linear_vel, double angular_vel);
