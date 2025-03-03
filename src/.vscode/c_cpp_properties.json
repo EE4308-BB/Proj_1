@@ -1,0 +1,24 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/mvjervoso/ee4308/install/ee4308_turtle/include/**",
+        "/home/mvjervoso/ee4308/install/ee4308_core/include/**",
+        "/opt/ros/humble/include/**",
+        "/home/mvjervoso/ee4308/src/ee4308_core/include/**",
+        "/home/mvjervoso/ee4308/src/ee4308_turtle/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}

@@ -65,6 +65,12 @@ namespace ee4308::turtle
             RCLCPP_WARN_STREAM(node_->get_logger(), "Global plan is empty!");
             return writeCmdVel(0, 0);
         }
+        // check if path contains more than just goal
+        if (global_plan_.poses.size() == 1)
+        {
+            RCLCPP_WARN_STREAM(node_->get_logger(), "Plan is a scam");
+            return writeCmdVel(0, 0);
+        }
 
 
         // get goal pose (contains the "clicked" goal rotation and position)
