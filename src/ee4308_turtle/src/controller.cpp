@@ -68,7 +68,7 @@ namespace ee4308::turtle
         // check if path contains more than just goal
         if (global_plan_.poses.size() == 1)
         {
-            RCLCPP_WARN_STREAM(node_->get_logger(), "Plan is a scam");
+            RCLCPP_WARN_STREAM(node_->get_logger(), "Path Invalid");
             return writeCmdVel(0, 0);
         }
 
